@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sesión integradora — asignación de preguntas por grupo</title>
+<style>
+  :root{
+    --bg:#FFFFFF; --bg-2:#FFFFFF; --panel:#FFFFFF; --panel-2:#F6F2E7;
+    --line: rgba(20,20,20,0.09); --line-strong: rgba(20,20,20,0.18);
+    --text:#1C1C1C; --muted:#5B5F66;
+    --accent:#C9971E; --accent-2:#0E7C5A; --accent-2-dim: rgba(14,124,90,0.10);
+    --ok:#146B49; --danger:#B3122E;
+    --radius:16px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0; background:#FFFFFF; color:var(--text); font-family:var(--font);
+    background-image:
+      radial-gradient(circle at 6% 4%, rgba(201,151,30,0.12), transparent 32%),
+      radial-gradient(circle at 96% 10%, rgba(179,18,46,0.06), transparent 28%),
+      radial-gradient(circle at 10% 96%, rgba(14,124,90,0.09), transparent 30%),
+      radial-gradient(circle at 94% 92%, rgba(201,151,30,0.10), transparent 32%);
+    background-attachment: fixed;
+  }
+  .app{ max-width:1180px; margin:0 auto; padding:26px 24px 60px; }
+  .stage, .panel, .results{ box-shadow:0 2px 18px rgba(20,20,20,0.06); }
+
+  header{ margin-bottom:22px; }
+  .brand{ font-size:26px; font-weight:900; letter-spacing:-.01em; display:flex; align-items:center; gap:10px;}
+  .brand .dot{ width:10px; height:10px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 5px rgba(201,151,30,0.15);}
+  .brand-sub{ color:var(--muted); font-size:15px; font-weight:700; margin:6px 0 0 20px; }
+
+  main{ display:grid; grid-template-columns: 1.25fr 0.95fr; gap:30px; align-items:start; }
+  @media (max-width: 920px){ main{ grid-template-columns:1fr; } }
+
+  /* ---------------- wheel ---------------- */
+  .stage{
+    background:var(--bg-2); border:1px solid var(--line); border-radius:24px;
+    padding:34px 40px 40px; display:flex; flex-direction:column; align-items:center; gap:18px;
+  }
+  .turn-pill{
+    font-size:17px; font-weight:800; padding:11px 22px; border-radius:100px;
+    background:var(--accent-2-dim); border:1px solid rgba(14,124,90,0.35); color:var(--accent-2);
+    display:flex; align-items:center; gap:8px;
+  }
+  .turn-pill.done{ background:rgba(20,107,73,0.10); border-color:rgba(20,107,73,0.4); color:var(--ok); }
+  .turn-pill.blocked{ background:rgba(179,18,46,0.08); border-color:rgba(179,18,46,0.35); color:var(--danger); }
+
+  .wheel-wrap{ position:relative; width:min(90vw, 440px); aspect-ratio:1/1; }
+  #wheelCanvas{ width:100%; height:100%; display:block; filter:drop-shadow(0 18px 40px rgba(0,0,0,0.45)); cursor:pointer; }
+  .rim{ position:absolute; inset:0; border-radius:50%; pointer-events:none; box-shadow: inset 0 0 0 6px rgba(255,255,255,0.05), inset 0 0 0 8px rgba(0,0,0,0.25); }
+  .pointer{
+    position:absolute; right:-6px; top:50%; transform:translateY(-50%);
+    width:0; height:0; border-top:16px solid transparent; border-bottom:16px solid transparent;
+    border-right:28px solid var(--accent); filter: drop-shadow(2px 0 3px rgba(0,0,0,0.5)); z-index:5;
+  }
+  .hub{
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    width:26%; height:26%; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #4A1420, #240A11);
+    border:3px solid var(--accent); box-shadow:inset 0 0 0 3px rgba(255,255,255,0.12), 0 8px 20px rgba(0,0,0,0.35);
+    color:#FFF7E6; font-weight:900; font-size:clamp(13px,2.6vw,17px); letter-spacing:.03em;
+    display:flex; align-items:center; justify-content:center; text-align:center; line-height:1.15;
+    cursor:pointer; transition:transform .12s ease; z-index:6;
+  }
+  .hub:hover{ transform:translate(-50%,-50%) scale(1.04); }
+  .hub:disabled, .hub.spinning{ opacity:.45; cursor:default; transform:translate(-50%,-50%); }
+
+  .stage-note{ font-size:14px; font-weight:600; color:var(--muted); text-align:center; max-width:380px;}
+
+  /* ---------------- panel ---------------- */
+  .panel{ background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:20px; margin-bottom:20px; }
+  .panel h2{ font-size:19px; margin:0 0 4px; display:flex; align-items:center; justify-content:space-between; font-weight:900; letter-spacing:-.01em; }
+  .badge{ font-size:13px; font-weight:800; color:var(--accent); background:rgba(201,151,30,0.14); padding:4px 12px; border-radius:100px;}
+  .panel-sub{ font-size:13.5px; font-weight:600; color:var(--muted); margin-bottom:14px; }
+  .lock-note{ font-size:11.5px; color:var(--danger); background:rgba(179,18,46,0.06); border:1px solid rgba(179,18,46,0.25); padding:8px 10px; border-radius:8px; margin-bottom:12px; }
+
+  .entries-list{ display:flex; flex-direction:column; gap:8px; max-height:230px; overflow-y:auto; padding-right:4px; margin-bottom:12px;}
+  .entry-row{ display:flex; align-items:center; gap:10px; background:var(--panel-2); border:1px solid var(--line); border-radius:10px; padding:8px 8px 8px 12px;}
+  .entry-row .dot{ width:11px; height:11px; border-radius:50%; flex-shrink:0;}
+  .entry-row input{ flex:1; background:transparent; border:none; outline:none; color:var(--text); font-family:var(--font); font-size:15.5px; font-weight:700; padding:5px 2px;}
+  .entry-row input:disabled{ color:var(--muted); }
+  .entry-row .del{ width:24px; height:24px; border-radius:8px; border:1px solid transparent; background:transparent; color:var(--muted); cursor:pointer; font-size:13px; flex-shrink:0;}
+  .entry-row .del:hover{ background:rgba(255,107,107,0.12); color:var(--danger); border-color:rgba(255,107,107,0.3);}
+  .entry-row .del:disabled{ opacity:.3; cursor:default; }
+
+  #addForm{ display:flex; gap:8px; }
+  #newEntry{ flex:1; background:var(--panel-2); border:1px solid var(--line-strong); border-radius:10px; padding:9px 12px; color:var(--text); font-family:var(--font); font-size:13.5px; outline:none;}
+  #newEntry:focus{ border-color:var(--accent-2); }
+  #addForm button{ width:40px; border-radius:10px; border:1px solid var(--line-strong); background:var(--accent-2); color:#fff; font-size:17px; font-weight:700; cursor:pointer;}
+  #addForm button:disabled{ opacity:.35; cursor:default; }
+
+  .teams-config{ display:flex; gap:8px; align-items:center; }
+  .teams-config input{ width:70px; background:var(--panel-2); border:1px solid var(--line-strong); border-radius:10px; padding:9px 10px; color:var(--text); font-family:var(--font); font-size:13.5px; outline:none; text-align:center;}
+  .teams-config button{ flex:1; }
+
+  .btn{
+    font-family:var(--font); font-size:14.5px; font-weight:800; color:var(--text);
+    background:var(--panel-2); border:1px solid var(--line-strong); border-radius:100px;
+    padding:10px 16px; cursor:pointer; transition:transform .12s ease, border-color .12s ease;
+  }
+  .btn:hover{ border-color:var(--accent); transform:translateY(-1px);}
+  .btn:disabled{ opacity:.35; cursor:default; transform:none; }
+  .btn.primary{ background:var(--accent); border-color:var(--accent); color:#241a02;}
+  .btn.danger:hover{ border-color:var(--danger); }
+  .row-actions{ display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;}
+  .row-actions .btn{ flex:1; }
+
+  .setting-row{ display:flex; align-items:center; justify-content:space-between; padding:8px 0; font-size:13px; }
+  .switch{ position:relative; width:36px; height:21px; flex-shrink:0;}
+  .switch input{ opacity:0; width:0; height:0;}
+  .slider{ position:absolute; inset:0; background:var(--panel-2); border:1px solid var(--line-strong); border-radius:100px; cursor:pointer; transition:.2s;}
+  .slider::before{ content:""; position:absolute; width:15px; height:15px; left:2px; top:2px; background:var(--muted); border-radius:50%; transition:.2s;}
+  .switch input:checked + .slider{ background:rgba(255,176,32,0.25); border-color:var(--accent);}
+  .switch input:checked + .slider::before{ transform:translateX(15px); background:var(--accent);}
+
+  /* ---------------- results table ---------------- */
+  .results{ background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:22px 24px; margin-top:28px;}
+  .results h2{ font-size:20px; margin:0 0 2px; font-weight:900; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;}
+  .results .panel-sub{ margin-bottom:16px; }
+  table{ width:100%; border-collapse:collapse; }
+  thead th{ text-align:left; font-size:13.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); font-weight:800; padding:10px 12px; border-bottom:2px solid var(--line-strong); }
+  tbody td{ padding:14px 12px; font-size:19px; font-weight:700; border-bottom:1px solid var(--line); }
+  tbody tr.current{ background:var(--accent-2-dim); }
+  tbody tr.assigned td.q{ color:var(--text); font-weight:800; }
+  td.q.pending{ color:var(--muted); font-style:italic; font-weight:600; }
+  td.num{ color:var(--muted); font-family:ui-monospace, monospace; font-size:15px; font-weight:700; width:36px; }
+
+  .results-actions{ display:flex; gap:10px; margin-top:18px; flex-wrap:wrap; }
+
+  /* ---------------- result overlay ---------------- */
+  .result-overlay{
+    position:fixed; inset:0; background:rgba(10,11,16,0.75); backdrop-filter:blur(4px);
+    display:flex; align-items:center; justify-content:center; z-index:100;
+    opacity:0; visibility:hidden; transition:opacity .25s ease;
+  }
+  .result-overlay.show{ opacity:1; visibility:visible; }
+  .result-card{
+    background:var(--panel); border:1px solid var(--line-strong); border-radius:22px;
+    padding:38px 44px; text-align:center; max-width:440px; width:90%;
+    transform:scale(.9) translateY(10px); transition:transform .3s ease;
+    box-shadow:0 30px 80px rgba(0,0,0,0.5);
+  }
+  .result-overlay.show .result-card{ transform:scale(1) translateY(0); }
+  .result-eyebrow{ font-size:11.5px; letter-spacing:.16em; color:var(--accent); font-weight:700; margin-bottom:12px;}
+  .result-team{ font-size:17px; color:var(--muted); margin-bottom:6px; font-weight:800;}
+  .result-value{ font-size:clamp(24px,4.8vw,34px); font-weight:900; margin-bottom:26px; word-break:break-word; }
+  .result-actions{ display:flex; gap:10px; justify-content:center; }
+
+  ::-webkit-scrollbar{ width:7px; }
+  ::-webkit-scrollbar-thumb{ background:var(--line-strong); border-radius:10px; }
+
+  .credits{
+    text-align:center; margin-top:34px; padding-top:18px;
+    border-top:1px solid var(--line); color:var(--muted);
+    font-size:12.5px; letter-spacing:.08em; text-transform:uppercase; font-weight:600;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div class="brand"><span class="dot"></span>Sesión integradora</div>
+    <div class="brand-sub">Asigna aleatoriamente una pregunta del balotario a cada grupo</div>
+  </header>
+
+  <main>
+    <section class="stage">
+      <div class="turn-pill" id="turnPill">Turno: Grupo 1 de 8</div>
+      <div class="wheel-wrap" id="wheelWrap">
+        <canvas id="wheelCanvas" width="900" height="900"></canvas>
+        <div class="rim"></div>
+        <div class="pointer"></div>
+        <button class="hub" id="spinBtn">GIRAR</button>
+      </div>
+      <p class="stage-note">Toca la ruleta o el botón central: la pregunta que salga se asigna automáticamente al grupo en turno y se retira de la ruleta.</p>
+    </section>
+
+    <div>
+      <div class="panel">
+        <h2>Preguntas <span class="badge" id="qBadge">10</span></h2>
+        <p class="panel-sub">Balotario de preguntas disponibles para repartir.</p>
+        <div class="lock-note" id="lockNote" style="display:none;">La sesión ya comenzó — reinicia para editar las preguntas.</div>
+        <div class="entries-list" id="entriesList"></div>
+        <form id="addForm">
+          <input id="newEntry" placeholder="Añadir una pregunta…" autocomplete="off">
+          <button type="submit">+</button>
+        </form>
+      </div>
+
+      <div class="panel">
+        <h2>Grupos <span class="badge" id="teamBadge">8</span></h2>
+        <p class="panel-sub">Cantidad de grupos a los que repartirás preguntas.</p>
+        <div class="teams-config">
+          <input type="number" id="teamsCount" value="8" min="1" max="30">
+          <button class="btn" id="applyTeams">Generar grupos</button>
+        </div>
+        <div class="setting-row" style="margin-top:14px;">
+          <div>Sonido</div>
+          <label class="switch"><input type="checkbox" id="soundToggle" checked><span class="slider"></span></label>
+        </div>
+        <div class="row-actions">
+          <button class="btn danger" id="resetBtn">↺ Reiniciar sesión</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <section class="results">
+    <h2>Resultados <span class="badge" id="progressBadge">0 / 8 asignadas</span></h2>
+    <p class="panel-sub">Se completa automáticamente en cada giro.</p>
+    <table>
+      <thead><tr><th class="num">#</th><th>Grupo</th><th>Pregunta asignada</th></tr></thead>
+      <tbody id="resultsBody"></tbody>
+    </table>
+    <div class="results-actions">
+      <button class="btn primary" id="downloadTxt">⬇ Descargar resultados (.txt)</button>
+      <button class="btn" id="btnExportQ">Exportar preguntas (.json)</button>
+      <button class="btn" id="btnImportQ">Importar preguntas (.json)</button>
+      <input type="file" id="fileImportQ" accept="application/json" hidden>
+    </div>
+  </section>
+
+  <footer class="credits">Prof. Michel Choccña</footer>
+</div>
+
+<div class="result-overlay" id="resultOverlay">
+  <div class="result-card">
+    <div class="result-eyebrow">PREGUNTA ASIGNADA</div>
+    <div class="result-team" id="resultTeam">Grupo 1</div>
+    <div class="result-value" id="resultValue">—</div>
+    <div class="result-actions">
+      <button class="btn primary" id="continueBtn">Continuar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  const PALETTE = ['#FF6B6B','#FFB020','#F5E663','#8BD17C','#4DD0C8','#4DA1FF','#8C7BFF','#FF7BD1','#FF9F6B','#6BE0A0','#5AC8FA','#E0607E'];
+
+  const canvas = document.getElementById('wheelCanvas');
+  const ctx = canvas.getContext('2d');
+  const spinBtn = document.getElementById('spinBtn');
+  const turnPill = document.getElementById('turnPill');
+  const entriesListEl = document.getElementById('entriesList');
+  const qBadge = document.getElementById('qBadge');
+  const teamBadge = document.getElementById('teamBadge');
+  const progressBadge = document.getElementById('progressBadge');
+  const addForm = document.getElementById('addForm');
+  const newEntryInput = document.getElementById('newEntry');
+  const lockNote = document.getElementById('lockNote');
+  const teamsCountInput = document.getElementById('teamsCount');
+  const applyTeamsBtn = document.getElementById('applyTeams');
+  const soundToggleChk = document.getElementById('soundToggle');
+  const resetBtn = document.getElementById('resetBtn');
+  const resultsBody = document.getElementById('resultsBody');
+  const downloadTxtBtn = document.getElementById('downloadTxt');
+  const btnExportQ = document.getElementById('btnExportQ');
+  const btnImportQ = document.getElementById('btnImportQ');
+  const fileImportQ = document.getElementById('fileImportQ');
+  const resultOverlay = document.getElementById('resultOverlay');
+  const resultTeam = document.getElementById('resultTeam');
+  const resultValue = document.getElementById('resultValue');
+  const continueBtn = document.getElementById('continueBtn');
+
+  const DEFAULT_QUESTIONS = Array.from({length:10}, (_,i)=>({id:'q'+(i+1), text:'Pregunta '+(i+1)}));
+
+  let state = {
+    questions: DEFAULT_QUESTIONS.map(q=>({...q})), // banco completo
+    assignedIds: new Set(),
+    teams: [],
+    turnIndex: 0,
+    rotation: 0,
+    spinning: false,
+    lastTickIndex: null
+  };
+
+  function buildTeams(n){
+    state.teams = Array.from({length:n}, (_,i)=>({name:'Grupo '+(i+1), questionText:null}));
+  }
+  buildTeams(8);
+
+  let audioCtx = null;
+  function ensureAudio(){ if(!audioCtx){ try{ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ audioCtx=null; } } }
+  function tone(freq,dur,type,gain){
+    if(!audioCtx || !soundToggleChk.checked) return;
+    const t0=audioCtx.currentTime, osc=audioCtx.createOscillator(), g=audioCtx.createGain();
+    osc.type=type||'square'; osc.frequency.setValueAtTime(freq,t0);
+    g.gain.setValueAtTime(0,t0); g.gain.linearRampToValueAtTime(gain||0.06,t0+0.005); g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+    osc.connect(g); g.connect(audioCtx.destination); osc.start(t0); osc.stop(t0+dur);
+  }
+  function playTick(){ tone(720,0.045,'square',0.05); }
+  function playWin(){ if(!audioCtx||!soundToggleChk.checked) return; [523.25,659.25,783.99].forEach((f,i)=>setTimeout(()=>tone(f,0.28,'triangle',0.08), i*90)); }
+
+  function colorFor(i){ return PALETTE[i % PALETTE.length]; }
+  function contrastText(hex){
+    const c=hex.replace('#',''); const r=parseInt(c.substring(0,2),16),g=parseInt(c.substring(2,4),16),b=parseInt(c.substring(4,6),16);
+    const lum=(0.299*r+0.587*g+0.114*b)/255; return lum>0.62 ? '#1A1A22' : '#FFFFFF';
+  }
+  function escapeHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  function availableQuestions(){ return state.questions.filter(q=>!state.assignedIds.has(q.id)); }
+  function sessionStarted(){ return state.assignedIds.size > 0; }
+
+  /* ---------------- preguntas panel ---------------- */
+  function renderList(){
+    const locked = sessionStarted();
+    lockNote.style.display = locked ? 'block' : 'none';
+    newEntryInput.disabled = locked;
+    addForm.querySelector('button').disabled = locked;
+
+    entriesListEl.innerHTML = '';
+    state.questions.forEach((q, i)=>{
+      const isAssigned = state.assignedIds.has(q.id);
+      const row = document.createElement('div');
+      row.className = 'entry-row';
+      row.style.opacity = isAssigned ? '0.45' : '1';
+      row.innerHTML =
+        '<span class="dot" style="background:'+colorFor(i)+'"></span>'+
+        '<input type="text" value="'+escapeHtml(q.text)+'" data-id="'+q.id+'" '+((locked)?'disabled':'')+'>'+
+        '<button class="del" data-id="'+q.id+'" title="Eliminar" '+((locked)?'disabled':'')+'>✕</button>';
+      entriesListEl.appendChild(row);
+    });
+    qBadge.textContent = state.questions.length;
+  }
+  entriesListEl.addEventListener('input', (e)=>{
+    if(e.target.tagName==='INPUT' && !sessionStarted()){
+      const id=e.target.dataset.id; const q=state.questions.find(x=>x.id===id);
+      if(q){ q.text=e.target.value; drawWheel(); }
+    }
+  });
+  entriesListEl.addEventListener('click', (e)=>{
+    if(e.target.classList.contains('del') && !sessionStarted()){
+      const id=e.target.dataset.id;
+      if(state.questions.length<=1) return;
+      state.questions = state.questions.filter(x=>x.id!==id);
+      renderList(); drawWheel();
+    }
+  });
+  addForm.addEventListener('submit', (e)=>{
+    e.preventDefault();
+    if(sessionStarted()) return;
+    const v=newEntryInput.value.trim();
+    if(!v) return;
+    state.questions.push({id:'q'+Date.now()+Math.floor(Math.random()*1000), text:v});
+    newEntryInput.value='';
+    renderList(); drawWheel();
+  });
+
+  btnExportQ.addEventListener('click', ()=>{
+    const data = JSON.stringify({questions: state.questions.map(q=>q.text)}, null, 2);
+    const blob = new Blob([data], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download='balotario-preguntas.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  });
+  btnImportQ.addEventListener('click', ()=>{
+    if(sessionStarted()){ alert('Reinicia la sesión antes de importar un nuevo balotario.'); return; }
+    fileImportQ.click();
+  });
+  fileImportQ.addEventListener('change', (e)=>{
+    const file=e.target.files[0]; if(!file) return;
+    const reader=new FileReader();
+    reader.onload=(ev)=>{
+      try{
+        const data=JSON.parse(ev.target.result);
+        if(Array.isArray(data.questions) && data.questions.length>=1){
+          state.questions = data.questions.map((t,i)=>({id:'q'+i+'_'+Date.now(), text:String(t)}));
+          state.rotation=0;
+          renderList(); drawWheel();
+        } else { alert('El archivo debe tener al menos 1 pregunta.'); }
+      }catch(err){ alert('No se pudo leer el archivo JSON.'); }
+    };
+    reader.readAsText(file); fileImportQ.value='';
+  });
+
+  /* ---------------- grupos ---------------- */
+  applyTeamsBtn.addEventListener('click', ()=>{
+    const n = Math.max(1, Math.min(30, parseInt(teamsCountInput.value,10) || 8));
+    teamsCountInput.value = n;
+    if(sessionStarted()){
+      if(!confirm('Ya hay preguntas asignadas. Generar grupos de nuevo reiniciará toda la sesión. ¿Continuar?')) return;
+      fullReset();
+    }
+    buildTeams(n);
+    renderResultsTable();
+    updateTurnUI();
+  });
+
+  /* ---------------- tabla de resultados ---------------- */
+  function renderResultsTable(){
+    resultsBody.innerHTML = '';
+    state.teams.forEach((t,i)=>{
+      const tr = document.createElement('tr');
+      if(i === state.turnIndex && state.turnIndex < state.teams.length) tr.className='current';
+      const qCell = t.questionText
+        ? '<td class="q">'+escapeHtml(t.questionText)+'</td>'
+        : '<td class="q pending">— pendiente —</td>';
+      tr.innerHTML = '<td class="num">'+(i+1)+'</td><td>'+escapeHtml(t.name)+'</td>'+qCell;
+      resultsBody.appendChild(tr);
+    });
+    teamBadge.textContent = state.teams.length;
+    const done = state.teams.filter(t=>t.questionText).length;
+    progressBadge.textContent = done + ' / ' + state.teams.length + ' asignadas';
+  }
+
+  function updateTurnUI(){
+    const total = state.teams.length;
+    turnPill.classList.remove('done','blocked');
+    if(state.turnIndex >= total){
+      turnPill.textContent = '✓ Todos los grupos tienen pregunta';
+      turnPill.classList.add('done');
+      spinBtn.disabled = true;
+      spinBtn.textContent = 'LISTO';
+      return;
+    }
+    if(availableQuestions().length === 0){
+      turnPill.textContent = 'Sin preguntas disponibles';
+      turnPill.classList.add('blocked');
+      spinBtn.disabled = true;
+      spinBtn.textContent = '—';
+      return;
+    }
+    turnPill.textContent = 'Turno: ' + state.teams[state.turnIndex].name + ' de ' + total;
+    spinBtn.disabled = false;
+    spinBtn.textContent = 'GIRAR';
+  }
+
+  /* ---------------- rueda ---------------- */
+  function drawWheel(highlightIndex){
+    const W=canvas.width, H=canvas.height, cx=W/2, cy=H/2, radius=W/2-10;
+    const pool = availableQuestions();
+    const n = pool.length;
+    ctx.clearRect(0,0,W,H);
+    if(n===0) return;
+    const ap=(Math.PI*2)/n;
+    ctx.save(); ctx.translate(cx,cy); ctx.rotate(state.rotation);
+    for(let i=0;i<n;i++){
+      const start=i*ap, end=(i+1)*ap;
+      const globalIndex = state.questions.findIndex(q=>q.id===pool[i].id);
+      const col = colorFor(globalIndex);
+      ctx.beginPath(); ctx.moveTo(0,0); ctx.arc(0,0,radius,start,end); ctx.closePath();
+      ctx.fillStyle=col; ctx.fill();
+      if(highlightIndex===i){ ctx.lineWidth=8; ctx.strokeStyle='#FFFFFF'; ctx.stroke(); }
+      else{ ctx.lineWidth=3; ctx.strokeStyle='rgba(20,20,28,0.55)'; ctx.stroke(); }
+      const label = pool[i].text || '';
+      ctx.save();
+      ctx.rotate(start+ap/2);
+      ctx.textAlign='right'; ctx.textBaseline='middle';
+      ctx.fillStyle=contrastText(col);
+      const fontSize=Math.max(19,Math.min(34, 420/n));
+      ctx.font='900 '+fontSize+'px '+getComputedStyle(document.body).fontFamily;
+      let text=label;
+      const maxChars=Math.max(6, Math.floor(radius/(fontSize*0.62)));
+      if(text.length>maxChars) text=text.slice(0,maxChars-1)+'…';
+      ctx.fillText(text, radius-22, 0);
+      ctx.restore();
+    }
+    ctx.beginPath(); ctx.arc(0,0,radius*0.13,0,Math.PI*2); ctx.fillStyle='#1A1D27'; ctx.fill();
+    ctx.restore();
+  }
+
+  function normalizeAngle(a){ const t=Math.PI*2; return ((a%t)+t)%t; }
+  function winnerIndexAt(rotation){
+    const n = availableQuestions().length;
+    if(n===0) return -1;
+    const ap=(Math.PI*2)/n;
+    const norm = normalizeAngle(-rotation);
+    return Math.floor(norm/ap) % n;
+  }
+
+  function spin(){
+    if(state.spinning) return;
+    if(state.turnIndex >= state.teams.length) return;
+    const pool = availableQuestions();
+    if(pool.length === 0) return;
+    ensureAudio(); if(audioCtx && audioCtx.state==='suspended') audioCtx.resume();
+
+    state.spinning = true;
+    spinBtn.classList.add('spinning'); spinBtn.disabled = true; spinBtn.textContent='···';
+
+    const duration = 4500 + Math.random()*1800;
+    const extraTurns = 5 + Math.random()*3;
+    const randomOffset = Math.random()*Math.PI*2;
+    const startRotation = state.rotation;
+    const targetRotation = startRotation + extraTurns*Math.PI*2 + randomOffset;
+    state.lastTickIndex = winnerIndexAt(startRotation);
+    const t0 = performance.now();
+    function easeOutCubic(t){ return 1-Math.pow(1-t,3); }
+
+    function frame(now){
+      const elapsed = now - t0;
+      const t = Math.min(1, elapsed/duration);
+      const eased = easeOutCubic(t);
+      state.rotation = startRotation + (targetRotation-startRotation)*eased;
+      drawWheel();
+      const idx = winnerIndexAt(state.rotation);
+      if(idx !== state.lastTickIndex){ state.lastTickIndex = idx; playTick(); }
+      if(t<1){ requestAnimationFrame(frame); } else { state.rotation = normalizeAngle(targetRotation); finishSpin(); }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function finishSpin(){
+    const pool = availableQuestions();
+    const idx = winnerIndexAt(state.rotation);
+    drawWheel(idx);
+    state.spinning = false;
+    spinBtn.classList.remove('spinning');
+    playWin();
+
+    const question = pool[idx];
+    const team = state.teams[state.turnIndex];
+    team.questionText = question.text;
+    state.assignedIds.add(question.id);
+    state.turnIndex++;
+
+    renderList();
+    renderResultsTable();
+
+    resultTeam.textContent = team.name;
+    resultValue.textContent = question.text;
+    continueBtn.textContent = (state.turnIndex >= state.teams.length) ? 'Finalizar' : 'Continuar';
+    resultOverlay.classList.add('show');
+  }
+
+  continueBtn.addEventListener('click', ()=>{
+    resultOverlay.classList.remove('show');
+    state.rotation = 0;
+    drawWheel();
+    updateTurnUI();
+  });
+
+  spinBtn.addEventListener('click', spin);
+  canvas.addEventListener('click', spin);
+
+  /* ---------------- reset / descarga ---------------- */
+  function fullReset(){
+    state.assignedIds = new Set();
+    state.turnIndex = 0;
+    state.rotation = 0;
+    state.teams.forEach(t=>t.questionText=null);
+    renderList();
+    renderResultsTable();
+    updateTurnUI();
+    drawWheel();
+  }
+  resetBtn.addEventListener('click', ()=>{
+    if(!confirm('¿Reiniciar toda la sesión? Se borrarán las asignaciones (las preguntas y grupos configurados se mantienen).')) return;
+    fullReset();
+  });
+
+  downloadTxtBtn.addEventListener('click', ()=>{
+    const now = new Date();
+    const fecha = now.toLocaleDateString('es-PE') + ' ' + now.toLocaleTimeString('es-PE');
+    let lines = [];
+    lines.push('SESIÓN INTEGRADORA — Asignación de preguntas por grupo');
+    lines.push('Generado: ' + fecha);
+    lines.push('');
+    state.teams.forEach((t,i)=>{
+      lines.push((i+1)+'. '+t.name+': '+(t.questionText || '(sin asignar)'));
+    });
+    const blob = new Blob([lines.join('\n')], {type:'text/plain;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download='sesion-integradora-resultados.txt';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  });
+
+  /* ---------------- init ---------------- */
+  renderList();
+  renderResultsTable();
+  updateTurnUI();
+  drawWheel();
+  window.addEventListener('resize', ()=> drawWheel());
+})();
+</script>
+</body>
+</html>
